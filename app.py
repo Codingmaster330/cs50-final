@@ -6,55 +6,24 @@ import textwrap
 import sqlite3
 import requests
 import humanize
+import psycopg2
 
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 # from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
+from psycopg2.extras import RealDictCursor
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
-from google.oauth2 import service_account
 
 from functions import login_required, moderator_required
 
-BACKUP_INTERVAL = 36000
 UPLOAD_FOLDER = "static/uploads"
 ITEMS_FOLDER = "items"
-TMP_FOLDER = "/tmp"
 SHORTCUTS_FOLDER = "shortcuts"
-SERVICE_ACCOUNT_FILE = "credentials.json"
-SCOPES = ['https://www.googleapis.com/auth/drive']
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
-latest_backup = time.time()
-
-os.makedirs(TMP_FOLDER, exist_ok=True)
-
-creds = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
-)
-
-service = build('drive', 'v3', credentials=creds)
-
-DB_FILE_ID = "1JbCLaBDiGXLUU_G8EHKPSvaQ2MSGBK4T"
-DEST_FOLDER = TMP_FOLDER
-DEST_FILE_NAME = "mkw.db"
-
-DB_LOCATION = os.path.join(DEST_FOLDER, DEST_FILE_NAME)
-
-db_request = service.files().get_media(fileId=DB_FILE_ID)
-
-fh = io.FileIO(DB_LOCATION, 'wb')
-downloader = MediaIoBaseDownload(fh, request)
-done = False
-
-while not done: _, done = downloader.next_chunk()
-
-print("File downloaded.")
-
 app = Flask(__name__)
-app.secret_key = "zFO3TG|`+!seJvvGky>2d)/pA'6HC;i@"
+app.secret_key = os.environ["APP_KEY"]
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # app.config["SESSION_PERMANENT"] = False
@@ -75,9 +44,6 @@ def after_request(response):
 
 @app.route("/")
 def index():
-    if time.time() - latest_backup >= BACKUP_INTERVAL:
-        update_database()
-        latest_backup = time.time()
     shortcuts, shortcut_items = get_shortcuts("WHERE is_approved=1")
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
@@ -89,7 +55,7 @@ def my_shortcuts():
 
 @app.route("/view_shortcut", methods=["GET", "POST"])
 def view_shortcut():
-    con = sqlite3.connect(DB_LOCATION)
+    con = get_db_connection()
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
@@ -162,7 +128,7 @@ def register():
             return redirect(url_for("register"))
         
         hash = generate_password_hash(password)
-        con = sqlite3.connect(DB_LOCATION)
+        con = get_db_connection()
         con.row_factory = sqlite3.Row
         cur = con.cursor()
 
@@ -183,7 +149,7 @@ def register():
 @app.route("/shortcut-creation", methods=["GET", "POST"])
 @login_required
 def shortcut_creation():
-    con = sqlite3.connect(DB_LOCATION)
+    con = get_db_connection()
     con.row_factory = sqlite3.Row
     cur = con.cursor()
     if request.method == "POST":
@@ -255,7 +221,7 @@ def login():
             flash("Missing password.")
             return redirect(url_for("login"))
     
-        con = sqlite3.connect(DB_LOCATION)
+        con = get_db_connection()
         con.row_factory = sqlite3.Row
         cur = con.cursor()
 
@@ -287,7 +253,7 @@ def logout():
 @app.route("/permissions", methods=["GET", "POST"])
 @moderator_required
 def permissions():
-    con = sqlite3.connect(DB_LOCATION)
+    con = get_db_connection()
     con.row_factory = sqlite3.Row
     cur = con.cursor()
     if request.method == "POST":
@@ -359,7 +325,7 @@ def course_creation():
             flash("Missing cup.")
             return redirect(url_for("course_creation"))
         
-        con = sqlite3.connect(DB_LOCATION)
+        con = get_db_connection()
         con.row_factory = sqlite3.Row
         cur = con.cursor()
 
@@ -387,7 +353,7 @@ def course_creation():
 
         return redirect("/")
     else:
-        con = sqlite3.connect(DB_LOCATION)
+        con = get_db_connection()
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cups=(cur.execute("SELECT name FROM cups")).fetchall()
@@ -403,7 +369,7 @@ def cup_creation():
             flash("Missing cup name.")
             return redirect(url_for("cup_creation"))
         
-        con = sqlite3.connect(DB_LOCATION)
+        con = get_db_connection()
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         try:
@@ -439,7 +405,7 @@ def item_creation():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], ITEMS_FOLDER, filename)
             file.save(filepath)
         
-        con = sqlite3.connect(DB_LOCATION)
+        con = get_db_connection()
         con.row_factory = sqlite3.Row
         cur = con.cursor()
 
@@ -461,7 +427,7 @@ def approve_shortcuts():
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 def get_shortcuts(where_prompt="", shorten_description=True):
-    con = sqlite3.connect(DB_LOCATION)
+    con = get_db_connection()
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
@@ -502,9 +468,8 @@ def check_video_url(video_url):
 
     return request.status_code == 200
 
-def update_database():
-    media = MediaFileUpload(DB_LOCATION, resumable=True)
-    service.files().update(fileId=DB_FILE_ID, media_body=media).execute()
+def get_db_connection():
+    return psycopg2.connect(os.environ["DB_CONNECTION"], cursor_factory=RealDictCursor)
 
 if __name__ == "__main__":
     app.run(debug=True)
