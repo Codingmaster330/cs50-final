@@ -7,8 +7,6 @@ import sqlite3
 import requests
 import humanize
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'vendor'))
-
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 # from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
