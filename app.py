@@ -28,7 +28,7 @@ app.secret_key = os.environ["APP_KEY"]
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 url = os.environ["DB_URL"]
-key = os.environ["DB_URL"]
+key = os.environ["DB_KEY"]
 
 supabase = create_client(url, key)
 
