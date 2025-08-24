@@ -11,6 +11,7 @@ import psycopg2
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 # from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
+from supabase import create_client
 from psycopg2.extras import RealDictCursor
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -25,6 +26,11 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 app = Flask(__name__)
 app.secret_key = os.environ["APP_KEY"]
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+url = os.environ["DB_URL"]
+key = os.environ["DB_URL"]
+
+supabase = create_client(url, key)
 
 # app.config["SESSION_PERMANENT"] = False
 # app.config["SESSION_TYPE"] = "filesystem"
@@ -44,20 +50,20 @@ def after_request(response):
 
 @app.route("/")
 def index():
-    shortcuts, shortcut_items = get_shortcuts("WHERE is_approved=1")
+    shortcuts, shortcut_items = get_shortcuts(("is_approved", 1))
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 @app.route("/my-shortcuts")
 @login_required
 def my_shortcuts():
-    shortcuts, shortcut_items = get_shortcuts("WHERE user_id=" + str(session["user_id"]))
+    shortcuts, shortcut_items = get_shortcuts(("user_id", session["user_id"]))
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 @app.route("/view_shortcut", methods=["GET", "POST"])
 def view_shortcut():
-    con = get_db_connection()
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
+    # con = get_db_connection()
+    # con.row_factory = sqlite3.Row
+    # cur = con.cursor()
 
     if request.method == "GET":
         shortcut_id = request.args.get("id")
@@ -66,7 +72,7 @@ def view_shortcut():
         if not shortcut_id.isdigit():
             return redirect("/")
 
-        shortcut, shortcut_items = get_shortcuts("WHERE shortcuts.id=" + shortcut_id, False)
+        shortcut, shortcut_items = get_shortcuts(("shortcuts.id", shortcut_id), False)
         if len(shortcut) != 1:
             return redirect("/")
         shortcut = shortcut[0]
@@ -87,21 +93,23 @@ def view_shortcut():
             elif "approve" in value:
                 try:
                     shortcut_id = int(value[len("approve"):])
-                    cur.execute("UPDATE shortcuts SET is_approved=1 WHERE id=?", (shortcut_id,))
+                    supabase.table("shortcuts").update({"is_approved": 1}).eq("id", shortcut_id).execute()
+                    # cur.execute("UPDATE shortcuts SET is_approved=1 WHERE id=?", (shortcut_id,))
                     flash("Shortcut approved.")
                 except:
                     return redirect("/")
             else:
                 try:
                     shortcut_id = int(value[len("remove"):])
-                    cur.execute("DELETE FROM shortcuts WHERE id=?", (shortcut_id,))
-                    cur.execute("DELETE FROM shortcut_items WHERE shortcut_id=?", (shortcut_id,))
+                    res = supabase.table("shortcuts").delete().eq("id", shortcut_id).execute()
+                    # cur.execute("DELETE FROM shortcuts WHERE id=?", (shortcut_id,))
+                    res = supabase.table("shortcut_items").delete().eq("shortcut_id", shortcut_id).execute()
+                    # cur.execute("DELETE FROM shortcut_items WHERE shortcut_id=?", (shortcut_id,))
                     flash("Shortcut removed.")
                 except:
                     return redirect("/")
         else:
             return redirect("/")
-    con.commit()
     return redirect("/")
 
 
@@ -128,19 +136,26 @@ def register():
             return redirect(url_for("register"))
         
         hash = generate_password_hash(password)
-        con = get_db_connection()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
+        # con = get_db_connection()
+        # con.row_factory = sqlite3.Row
+        # cur = con.cursor()
 
-        try:
-            id = (cur.execute("INSERT INTO users (username, hash, is_moderator) VALUES (?, ?, ?)", (username, hash, 0))).lastrowid
-        except:
+        res = supabase.table("users").insert({
+            "username": username,
+            "hash": hash,
+            "is_moderator": 0
+        })
+        if res.error:
             flash("Username is already in use.")
             return redirect(url_for("register"))
+        # try:
+        #     # id = (cur.execute("INSERT INTO users (username, hash, is_moderator) VALUES (?, ?, ?)", (username, hash, 0))).lastrowid
+        # except:
+        #     flash("Username is already in use.")
+        #     return redirect(url_for("register"))
         
-        con.commit()
-        
-        session["user_id"] = (cur.execute("SELECT id FROM users WHERE username=?", [(username)])).fetchall()[0]["id"]
+        session["user_id"] = supabase.table("users").select("id").eq("username", username).data[0]["id"]
+        # session["user_id"] = (cur.execute("SELECT id FROM users WHERE username=?", [(username)])).fetchall()[0]["id"]
 
         return redirect("/")
     else:
@@ -149,9 +164,9 @@ def register():
 @app.route("/shortcut-creation", methods=["GET", "POST"])
 @login_required
 def shortcut_creation():
-    con = get_db_connection()
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
+    # con = get_db_connection()
+    # con.row_factory = sqlite3.Row
+    # cur = con.cursor()
     if request.method == "POST":
         items = request.form.getlist("item")
         course = request.form.get("course")
@@ -192,21 +207,36 @@ def shortcut_creation():
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], SHORTCUTS_FOLDER, filename)
             file.save(filepath)
-        if not filepath: filepath = (cur.execute("SELECT image_url FROM courses WHERE id=?", (course,))).fetchone()["image_url"]
+        if not filepath: filepath = supabase.table("courses").select("image_url").eq("id", course).execute().data[0]["image_url"]
+        # if not filepath: filepath = (cur.execute("SELECT image_url FROM courses WHERE id=?", (course,))).fetchone()["image_url"]
         
         print(filepath)
-        shortcut_id = (cur.execute("INSERT INTO shortcuts (percentage, course_id, video_url, user_id, image_path, description, is_approved, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (percentage, course, video_url, session["user_id"], filepath, description, 0, datetime.now()))).lastrowid
+        shortcut_id = supabase.table("shortcuts").insert({
+            "percentage": percentage, 
+            "course_id": course, ""
+            "video_url": video_url, 
+            "user_id": session["user_id"],
+            "image_path": filepath,
+            "description": description,
+            "is_approved": 0,
+            "timestamp": datetime.now()
+        }).execute().data[0]["id"]
+        # shortcut_id = (cur.execute("INSERT INTO shortcuts (percentage, course_id, video_url, user_id, image_path, description, is_approved, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (percentage, course, video_url, session["user_id"], filepath, description, 0, datetime.now()))).lastrowid
         for item_id in items:
-            cur.execute("INSERT INTO shortcut_items (shortcut_id, item_id) VALUES (?, ?)", (shortcut_id, item_id))
+            res = supabase.table("shortcut_items").insert({"shortcut_id": shortcut_id, "item_id": item_id}).execute()
+            # cur.execute("INSERT INTO shortcut_items (shortcut_id, item_id) VALUES (?, ?)", (shortcut_id, item_id))
         
-        con.commit()
+        # con.commit()
 
         flash("Success! Please wait for your shortcut to be approved by the moderators.")
         return redirect("/")
     else:
-        cups = (cur.execute("SELECT * FROM cups")).fetchall()
-        courses = (cur.execute("SELECT * FROM courses")).fetchall()
-        items = (cur.execute("SELECT * FROM items")).fetchall()
+        cups = supabase.table("cups").select("*").execute().data
+        courses = supabase.table("courses").select("*").execute().data
+        items = supabase.table("items").select("*").execute().data
+        # cups = (cur.execute("SELECT * FROM cups")).fetchall()
+        # courses = (cur.execute("SELECT * FROM courses")).fetchall()
+        # items = (cur.execute("SELECT * FROM items")).fetchall()
         return render_template("shortcut-creation.html", cups=cups, courses=courses, items=items)
 
 @app.route("/login", methods=["GET", "POST"])
@@ -221,11 +251,12 @@ def login():
             flash("Missing password.")
             return redirect(url_for("login"))
     
-        con = get_db_connection()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
+        # con = get_db_connection()
+        # con.row_factory = sqlite3.Row
+        # cur = con.cursor()
 
-        user_info = (cur.execute("SELECT * FROM users WHERE username=?", (username,))).fetchall()
+        user_info = supabase.table("users").select("*").eq("username", username).execute().data
+        # user_info = (cur.execute("SELECT * FROM users WHERE username=?", (username,))).fetchall()
         if len(user_info) == 0:
             flash("User does not exist.")
             return redirect(url_for("login"))
@@ -235,7 +266,7 @@ def login():
             flash("Incorrect username and/or password.")
             return redirect(url_for("login"))
         
-        user_info = (cur.execute("SELECT * FROM users WHERE username=?", (username,))).fetchall()[0]
+        # user_info = (cur.execute("SELECT * FROM users WHERE username=?", (username,))).fetchall()[0]
         session["user_id"] = user_info["id"]
         if user_info["is_moderator"] == 1:
             session["is_moderator"] = True
@@ -253,9 +284,9 @@ def logout():
 @app.route("/permissions", methods=["GET", "POST"])
 @moderator_required
 def permissions():
-    con = get_db_connection()
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
+    # con = get_db_connection()
+    # con.row_factory = sqlite3.Row
+    # cur = con.cursor()
     if request.method == "POST":
         prode_values = ["Promote", "Demote"]
         prode = request.form.get("prode")
@@ -272,7 +303,8 @@ def permissions():
             flash("Username not provided.")
             return redirect(url_for("permissions"))
 
-        user_info = (cur.execute("SELECT * FROM users WHERE username=?", (user,))).fetchall()
+        user_info = supabase.table("users").select("*").eq("username", user).execute().data
+        # user_info = (cur.execute("SELECT * FROM users WHERE username=?", (user,))).fetchall()
         if len(user_info) == 0:
             flash("User does not exist.")
             return redirect(url_for("permissions"))
@@ -282,15 +314,18 @@ def permissions():
             return redirect(url_for("permissions"))
         
         if prode == "Promote":
-            cur.execute("UPDATE users SET is_moderator=? WHERE id=?", (1, user_info["id"]))
+            res = supabase.table("users").update({"is_moderator": 1}).eq("id", user_info["id"]).execute()
+            # cur.execute("UPDATE users SET is_moderator=? WHERE id=?", (1, user_info["id"]))
         else:
-            cur.execute("UPDATE users SET is_moderator=? WHERE id=?", (0, user_info["id"]))
+            res = supabase.table("users").update({"is_moderator": 0}).eq("id", user_info["id"]).execute()
+            # cur.execute("UPDATE users SET is_moderator=? WHERE id=?", (0, user_info["id"]))
         
-        con.commit()
+        # con.commit()
 
         return redirect("/")
     else:
-        users = (cur.execute("SELECT * FROM users WHERE id!=?", (session["user_id"],))).fetchall()
+        users = supabase.table("users").select("*").neq("id", session["user_id"]).execute().data
+        # users = (cur.execute("SELECT * FROM users WHERE id!=?", (session["user_id"],))).fetchall()
         regulars = [user for user in users if user["is_moderator"] == 0]
         moderators = [user for user in users if user["is_moderator"] == 1]
         
@@ -325,39 +360,56 @@ def course_creation():
             flash("Missing cup.")
             return redirect(url_for("course_creation"))
         
-        con = get_db_connection()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
+        # con = get_db_connection()
+        # con.row_factory = sqlite3.Row
+        # cur = con.cursor()
 
         if (ending_course):
-            ending_course_id = (cur.execute("SELECT id FROM courses WHERE name = ?", [(ending_course)])).fetchall()
+            ending_course_id = supabase.table("courses").select("id").eq("name", ending_course).execute().data
+            # ending_course_id = (cur.execute("SELECT id FROM courses WHERE name = ?", [(ending_course)])).fetchall()
             if len(ending_course_id) == 0:
                 flash("Ending course does not exist.")
                 return redirect(url_for("course_creation"))
-            
-        existing = (cur.execute("SELECT ending_course_id FROM courses WHERE name = ?", [(name)])).fetchall()
+        
+        existing = supabase.table("courses").select("ending_course_id").eq("name", name).execute().data
+        # existing = (cur.execute("SELECT ending_course_id FROM courses WHERE name = ?", [(name)])).fetchall()
         if len(existing) > 0 and existing[0]["ending_course_id"] == ending_course_id:
             flash("Course already exists.")
             return redirect(url_for("course_creation"))
         
-        cup_id = (cur.execute("SELECT id FROM cups WHERE name = ?", [(cup)])).fetchall()
+        cup_id = supabase.table("cups").select("id").eq("name", cup).execute().data
+        # cup_id = (cur.execute("SELECT id FROM cups WHERE name = ?", [(cup)])).fetchall()
         if len(cup_id) == 0:
             flash("Cup does not exist.")
             return redirect(url_for("course_creation"))
         if (ending_course):
-            cur.execute("INSERT INTO courses (name, length, image_url, cup_id, ending_course_id) VALUES (?, ?, ?, ?, ?)", (name, length, url, cup_id[0]["id"], ending_course_id[0]["id"]))
+            res = supabase.table("courses").insert({
+                "name": name,
+                "length": length,
+                "image_url": url,
+                "cup_id": cup_id[0]["id"],
+                "ending_course_id": ending_course_id[0]["id"]
+            }).execute()
+            # cur.execute("INSERT INTO courses (name, length, image_url, cup_id, ending_course_id) VALUES (?, ?, ?, ?, ?)", (name, length, url, cup_id[0]["id"], ending_course_id[0]["id"]))
         else:
-            cur.execute("INSERT INTO courses (name, length, image_url, cup_id) VALUES (?, ?, ?, ?)", (name, length, url, cup_id[0]["id"]))
-
-        con.commit()
+            res = supabase.table("courses").insert({
+                "name": name,
+                "length": length,
+                "image_url": url,
+                "cup_id": cup_id[0]["id"]
+            }).execute()
+            # cur.execute("INSERT INTO courses (name, length, image_url, cup_id) VALUES (?, ?, ?, ?)", (name, length, url, cup_id[0]["id"]))
 
         return redirect("/")
     else:
-        con = get_db_connection()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cups=(cur.execute("SELECT name FROM cups")).fetchall()
-        courses=(cur.execute("SELECT name FROM courses")).fetchall()
+        # con = get_db_connection()
+        # con.row_factory = sqlite3.Row
+        # cur = con.cursor()
+
+        cups = supabase.table("cups").select("name").execute().data
+        # cups=(cur.execute("SELECT name FROM cups")).fetchall()
+        courses = supabase.table("courses").select("name").execute().data
+        # courses=(cur.execute("SELECT name FROM courses")).fetchall()
         return render_template("course-creation.html", cups=cups, courses=courses)
 
 @app.route("/cup-creation", methods=["GET", "POST"])
@@ -369,16 +421,22 @@ def cup_creation():
             flash("Missing cup name.")
             return redirect(url_for("cup_creation"))
         
-        con = get_db_connection()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        try:
-            cur.execute("INSERT INTO cups (name) VALUES (?)", [(name)])
-        except:
+        # con = get_db_connection()
+        # con.row_factory = sqlite3.Row
+        # cur = con.cursor()
+
+        res = supabase.table("cups").insert({"name": name}).execute()
+        if res.error:
             flash("Cup already exists.")
             return redirect(url_for("cup_creation"))
+
+        # try:
+        #     cur.execute("INSERT INTO cups (name) VALUES (?)", [(name)])
+        # except:
+        #     flash("Cup already exists.")
+        #     return redirect(url_for("cup_creation"))
         
-        con.commit()
+        # con.commit()
 
         return redirect("/")
     else:
@@ -405,16 +463,21 @@ def item_creation():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], ITEMS_FOLDER, filename)
             file.save(filepath)
         
-        con = get_db_connection()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
+        # con = get_db_connection()
+        # con.row_factory = sqlite3.Row
+        # cur = con.cursor()
 
-        try:
-            cur.execute("INSERT INTO items (name, image_path) VALUES (?, ?)", (name, filepath))
-        except:
+        res = supabase.table("items").insert({"name": name, "image_path": filepath}).execute()
+        if res.error:
             flash("Item name and/or filename already exists.")
             return redirect(url_for("item_creation"))
-        con.commit()
+        
+        # try:
+        #     cur.execute("INSERT INTO items (name, image_path) VALUES (?, ?)", (name, filepath))
+        # except:
+        #     flash("Item name and/or filename already exists.")
+        #     return redirect(url_for("item_creation"))
+        # con.commit()
 
         return redirect("/")
     else:
@@ -426,33 +489,42 @@ def approve_shortcuts():
     shortcuts, shortcut_items = get_shortcuts("WHERE is_approved=0")
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
-def get_shortcuts(where_prompt="", shorten_description=True):
-    con = get_db_connection()
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
+def get_shortcuts(where_prompt=None, shorten_description=True):
+    # con = get_db_connection()
+    # con.row_factory = sqlite3.Row
+    # cur = con.cursor()
 
-    shortcuts = (cur.execute("SELECT shortcuts.id, " \
-    "image_path, " \
-    "description, " \
-    "percentage, " \
-    "video_url, " \
-    "timestamp, " \
-    "is_approved, " \
-    "courses.name AS course_name, " \
-    "users.id AS user_id, " \
-    "users.username AS username " \
-    "FROM shortcuts JOIN courses ON shortcuts.course_id=courses.id " \
-    "JOIN users ON shortcuts.user_id=users.id " + where_prompt)).fetchall()
+    shortcuts = supabase.table("shortcuts").select(
+        "id, image_path, description, percentage, video_url, timestamp, is_approved, "
+        "courses.name:course_name, users.id:user_id, users.username:username"
+    ).execute().data
+    # shortcuts = (cur.execute("SELECT shortcuts.id, " \
+    # "image_path, " \
+    # "description, " \
+    # "percentage, " \
+    # "video_url, " \
+    # "timestamp, " \
+    # "is_approved, " \
+    # "courses.name AS course_name, " \
+    # "users.id AS user_id, " \
+    # "users.username AS username " \
+    # "FROM shortcuts JOIN courses ON shortcuts.course_id=courses.id " \
+    # "JOIN users ON shortcuts.user_id=users.id " + where_prompt)).fetchall()
     
-    shortcut_items = (cur.execute("SELECT shortcut_id, " \
-    "items.image_path AS item_image_path, " \
-    "items.name AS item_name " \
-    "FROM shortcut_items JOIN items ON shortcut_items.item_id=items.id " \
-    "JOIN shortcuts ON shortcuts.id = shortcut_id " + where_prompt)).fetchall()
+    shortcut_items = supabase.table("shortcut_items").select(
+        "shortcut_id, items.image_path:image_path, items.name:item_name"
+    ).execute().data
+    # shortcut_items = (cur.execute("SELECT shortcut_id, " \
+    # "items.image_path AS item_image_path, " \
+    # "items.name AS item_name " \
+    # "FROM shortcut_items JOIN items ON shortcut_items.item_id=items.id " \
+    # "JOIN shortcuts ON shortcuts.id = shortcut_id " + where_prompt)).fetchall()
 
     modified_shortcuts = []
     for shortcut in shortcuts:
         shortcut_dict = dict(shortcut)
+        if where_prompt and where_prompt not in shortcut_dict.items():
+            continue
         shortcut_dict["difference"] = humanize.naturaltime(datetime.now() - datetime.strptime(shortcut_dict["timestamp"], "%Y-%m-%d %H:%M:%S.%f"))
         if shorten_description:
             shortcut_dict["description"] = textwrap.shorten(shortcut_dict["description"], 60, placeholder="...")
@@ -468,8 +540,8 @@ def check_video_url(video_url):
 
     return request.status_code == 200
 
-def get_db_connection():
-    return psycopg2.connect(os.environ["DB_CONNECTION"], cursor_factory=RealDictCursor)
+# def get_db_connection():
+#     return psycopg2.connect(os.environ["DB_CONNECTION"], cursor_factory=RealDictCursor)
 
 if __name__ == "__main__":
     app.run(debug=True)
