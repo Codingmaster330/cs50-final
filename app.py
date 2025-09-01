@@ -50,7 +50,6 @@ def after_request(response):
 
 @app.route("/")
 def index():
-    print(os.environ)
     shortcuts, shortcut_items = get_shortcuts({"is_approved": 1})
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
@@ -242,6 +241,9 @@ def shortcut_creation():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    print("test")
+    print(os.environ)
+
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
