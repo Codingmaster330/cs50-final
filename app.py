@@ -72,7 +72,7 @@ def view_shortcut():
         if not shortcut_id.isdigit():
             return redirect("/")
 
-        shortcut, shortcut_items = get_shortcuts({"shortcuts.id": shortcut_id}, False)
+        shortcut, shortcut_items = get_shortcuts({"id": shortcut_id}, False)
         if len(shortcut) != 1:
             return redirect("/")
         shortcut = shortcut[0]
