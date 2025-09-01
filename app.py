@@ -221,7 +221,7 @@ def shortcut_creation():
             "image_path": filepath,
             "description": description,
             "is_approved": 0,
-            "timestamp": datetime.now()
+            "timestamp": datetime.now().isoformat()
         }).execute().data[0]["id"]
         # shortcut_id = (cur.execute("INSERT INTO shortcuts (percentage, course_id, video_url, user_id, image_path, description, is_approved, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (percentage, course, video_url, session["user_id"], filepath, description, 0, datetime.now()))).lastrowid
         for item_id in items:
