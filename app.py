@@ -218,7 +218,7 @@ def shortcut_creation():
             "course_id": course,
             "video_url": video_url, 
             "user_id": session["user_id"],
-            "image_path": supabase.storage.from_("uploads").get_public_url(filepath).public_url,
+            "image_path": supabase.storage.from_("uploads").get_public_url(filepath)["publicUrl"],
             "description": description,
             "is_approved": 0,
             "timestamp": datetime.now().isoformat()
