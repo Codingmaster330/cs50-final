@@ -207,8 +207,8 @@ def shortcut_creation():
         filepath = None
         if file and file.filename != "" and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            with file.stream as f:
-                supabase.storage.from_("uploads").upload(f"shortcuts/{filename}", f)
+            file_bytes = file.read()
+            supabase.storage.from_("uploads").upload(f"shortcuts/{filename}", file_bytes)
             filepath = f"shortcuts/{filename}"
         if not filepath: filepath = supabase.table("courses").select("image_url").eq("id", course).execute().data[0]["image_url"]
         # if not filepath: filepath = (cur.execute("SELECT image_url FROM courses WHERE id=?", (course,))).fetchone()["image_url"]
