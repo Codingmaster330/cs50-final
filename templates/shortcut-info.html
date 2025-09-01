@@ -6,7 +6,7 @@
 
 {% block body %}
     <img class="rounded mx-auto mb-3" style="object-fit:cover; width:30vw; max-height:20vw" src="{{ shortcut.image_path }}">
-    <h1>{{ shortcut.course_name }}</h1>
+    <h1>{{ shortcut.courses.name }}</h1>
     <h5>Shortcut created by {{ shortcut.username }}</h3>
     <h6 style="color:#919191">Uploaded {{ shortcut.difference }}</h6>
     <div class="d-flex flex-wrap justify-content-center mb-3">

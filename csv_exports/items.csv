@@ -1,0 +1,10 @@
+id,name,image_path
+1,Mushroom,static/uploads\items\mushroom.png
+3,Triple Mushrooms,static/uploads\items\tripmush.png
+4,Golden Mushroom,static/uploads\items\goldmush.png
+5,Mega Mushroom,static/uploads\items\mega.png
+6,Bullet Bill,static/uploads\items\bullet.png
+7,Boo,static/uploads\items\boo.png
+8,Feather,static/uploads\items\feather.png
+9,Star,static/uploads\items\star.png
+10,Dash Food,static/uploads\items\dash.png
