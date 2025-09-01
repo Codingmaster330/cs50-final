@@ -50,13 +50,13 @@ def after_request(response):
 
 @app.route("/")
 def index():
-    shortcuts, shortcut_items = get_shortcuts(("is_approved", 1))
+    shortcuts, shortcut_items = get_shortcuts({"is_approved": 1})
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 @app.route("/my-shortcuts")
 @login_required
 def my_shortcuts():
-    shortcuts, shortcut_items = get_shortcuts(("user_id", session["user_id"]))
+    shortcuts, shortcut_items = get_shortcuts({"users.id": session["user_id"]})
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 @app.route("/view_shortcut", methods=["GET", "POST"])
@@ -72,7 +72,7 @@ def view_shortcut():
         if not shortcut_id.isdigit():
             return redirect("/")
 
-        shortcut, shortcut_items = get_shortcuts(("shortcuts.id", shortcut_id), False)
+        shortcut, shortcut_items = get_shortcuts({"shortcuts.id": shortcut_id}, False)
         if len(shortcut) != 1:
             return redirect("/")
         shortcut = shortcut[0]
@@ -494,10 +494,10 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
     # con.row_factory = sqlite3.Row
     # cur = con.cursor()
 
-    shortcuts = supabase.table("shortcuts").select(
+    shortcuts_query = supabase.table("shortcuts").select(
         "id, image_path, description, percentage, video_url, timestamp, is_approved, "
-        "courses.name:course_name, users.id:user_id, users.username:username"
-    ).execute().data
+        "courses(name), users(id, username)"
+    )
     # shortcuts = (cur.execute("SELECT shortcuts.id, " \
     # "image_path, " \
     # "description, " \
@@ -511,9 +511,17 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
     # "FROM shortcuts JOIN courses ON shortcuts.course_id=courses.id " \
     # "JOIN users ON shortcuts.user_id=users.id " + where_prompt)).fetchall()
     
-    shortcut_items = supabase.table("shortcut_items").select(
-        "shortcut_id, items.image_path:image_path, items.name:item_name"
-    ).execute().data
+    shortcut_items_query = supabase.table("shortcut_items").select(
+        "shortcut_id, items(image_path, name)"
+    )
+    
+    for column, value in where_prompt.items():
+        shortcuts_query = shortcuts_query.eq(column, value)
+        shortcut_items_query = shortcut_items_query.eq(column, value)
+
+    shortcuts = shortcuts_query.execute().data
+    shortcut_items = shortcut_items_query.execute().data
+
     # shortcut_items = (cur.execute("SELECT shortcut_id, " \
     # "items.image_path AS item_image_path, " \
     # "items.name AS item_name " \
@@ -523,8 +531,6 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
     modified_shortcuts = []
     for shortcut in shortcuts:
         shortcut_dict = dict(shortcut)
-        if where_prompt and where_prompt not in shortcut_dict.items():
-            continue
         shortcut_dict["difference"] = humanize.naturaltime(datetime.now() - datetime.strptime(shortcut_dict["timestamp"], "%Y-%m-%d %H:%M:%S.%f"))
         if shorten_description:
             shortcut_dict["description"] = textwrap.shorten(shortcut_dict["description"], 60, placeholder="...")
