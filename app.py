@@ -156,7 +156,7 @@ def register():
         #     flash("Username is already in use.")
         #     return redirect(url_for("register"))
         
-        session["user_id"] = supabase.table("users").select("id").eq("username", username).data[0]["id"]
+        session["user_id"] = supabase.table("users").select("id").eq("username", username).execute().data[0]["id"]
         # session["user_id"] = (cur.execute("SELECT id FROM users WHERE username=?", [(username)])).fetchall()[0]["id"]
 
         return redirect("/")
