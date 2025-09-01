@@ -27,7 +27,6 @@ app = Flask(__name__)
 app.secret_key = os.environ["APP_KEY"]
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-print(os.environ)
 url = os.environ["DB_URL"]
 key = os.environ["DB_KEY"]
 
@@ -51,6 +50,7 @@ def after_request(response):
 
 @app.route("/")
 def index():
+    print(os.environ)
     shortcuts, shortcut_items = get_shortcuts({"is_approved": 1})
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
