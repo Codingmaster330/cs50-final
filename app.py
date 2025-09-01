@@ -207,18 +207,18 @@ def shortcut_creation():
         filepath = None
         if file and file.filename != "" and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], SHORTCUTS_FOLDER, filename).replace("\\", "/")
-            file.save(filepath)
+            with file.stream as f:
+                supabase.storage.from_("uploads").upload(f"shortcuts/{filename}", f)
+            filepath = f"shortcuts/{filename}"
         if not filepath: filepath = supabase.table("courses").select("image_url").eq("id", course).execute().data[0]["image_url"]
         # if not filepath: filepath = (cur.execute("SELECT image_url FROM courses WHERE id=?", (course,))).fetchone()["image_url"]
         
-        print(filepath)
         shortcut_id = supabase.table("shortcuts").insert({
             "percentage": percentage, 
             "course_id": course,
             "video_url": video_url, 
             "user_id": session["user_id"],
-            "image_path": filepath,
+            "image_path": supabase.storage.from_("uploads").get_public_url(filepath).public_url,
             "description": description,
             "is_approved": 0,
             "timestamp": datetime.now().isoformat()
