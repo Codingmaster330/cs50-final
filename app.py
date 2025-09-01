@@ -144,7 +144,7 @@ def register():
             "username": username,
             "hash": hash,
             "is_moderator": 0
-        })
+        }).execute()
         if res.error:
             flash("Username is already in use.")
             return redirect(url_for("register"))
@@ -213,7 +213,7 @@ def shortcut_creation():
         print(filepath)
         shortcut_id = supabase.table("shortcuts").insert({
             "percentage": percentage, 
-            "course_id": course, ""
+            "course_id": course,
             "video_url": video_url, 
             "user_id": session["user_id"],
             "image_path": filepath,
@@ -489,7 +489,7 @@ def item_creation():
 @app.route("/approve-shortcuts", methods=["GET", "POST"])
 @moderator_required  
 def approve_shortcuts():
-    shortcuts, shortcut_items = get_shortcuts("WHERE is_approved=0")
+    shortcuts, shortcut_items = get_shortcuts({"is_approved": 0})
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 def get_shortcuts(where_prompt=None, shorten_description=True):
@@ -520,7 +520,8 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
     
     for column, value in where_prompt.items():
         shortcuts_query = shortcuts_query.eq(column, value)
-        shortcut_items_query = shortcut_items_query.eq(column, value)
+        if column == "shortcuts.id":
+            shortcut_items_query = shortcut_items_query.eq("shortcut_id", value)
 
     shortcuts = shortcuts_query.execute().data
     shortcut_items = shortcut_items_query.execute().data
