@@ -102,9 +102,9 @@ def view_shortcut():
             else:
                 try:
                     shortcut_id = int(value[len("remove"):])
+                    res = supabase.table("shortcut_items").delete().eq("shortcut_id", shortcut_id).execute()
                     res = supabase.table("shortcuts").delete().eq("id", shortcut_id).execute()
                     # cur.execute("DELETE FROM shortcuts WHERE id=?", (shortcut_id,))
-                    res = supabase.table("shortcut_items").delete().eq("shortcut_id", shortcut_id).execute()
                     # cur.execute("DELETE FROM shortcut_items WHERE shortcut_id=?", (shortcut_id,))
                     flash("Shortcut removed.")
                 except:
