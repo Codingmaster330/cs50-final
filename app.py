@@ -78,11 +78,11 @@ def view_shortcut():
             return redirect("/")
         shortcut = shortcut[0]
 
-        if shortcut["is_approved"] == 0:
+        if shortcut.is_approved == 0:
             try:
                 session["is_moderator"]
             except:
-                if session["user_id"] != shortcut["user_id"]: return redirect("/")        
+                if session.get("user_id") != shortcut.users.id: return redirect("/")        
 
         return render_template("shortcut-info.html", shortcut=shortcut, shortcut_items=shortcut_items)
     elif request.method == "POST":
