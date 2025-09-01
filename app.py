@@ -14,6 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from supabase import create_client
 from psycopg2.extras import RealDictCursor
 from werkzeug.utils import secure_filename
+from types import SimpleNamespace
 from datetime import datetime
 
 from functions import login_required, moderator_required
@@ -543,7 +544,7 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
             shortcut_dict["description"] = textwrap.shorten(shortcut_dict["description"], 60, placeholder="...")
         modified_shortcuts.append(shortcut_dict)
     
-    return modified_shortcuts, shortcut_items
+    return dict_to_obj(modified_shortcuts), dict_to_obj(shortcut_items)
 
 def check_video_url(video_url):
     checker_url = "https://www.youtube.com/oembed?url="
@@ -555,6 +556,14 @@ def check_video_url(video_url):
 
 # def get_db_connection():
 #     return psycopg2.connect(os.environ["DB_CONNECTION"], cursor_factory=RealDictCursor)
+
+def dict_to_obj(d):
+    if isinstance(d, dict):
+        return SimpleNamespace(**{k: dict_to_obj(v) for k, v in d.items()})
+    elif isinstance(d, list):
+        return [dict_to_obj(i) for i in d]
+    else:
+        return d
 
 if __name__ == "__main__":
     app.run(debug=True)
