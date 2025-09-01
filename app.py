@@ -27,6 +27,7 @@ app = Flask(__name__)
 app.secret_key = os.environ["APP_KEY"]
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+print(os.environ)
 url = os.environ["DB_URL"]
 key = os.environ["DB_KEY"]
 
