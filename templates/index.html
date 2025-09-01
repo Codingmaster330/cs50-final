@@ -15,7 +15,7 @@
                     <div class="d-flex flex-nowrap justify-content-center my-2 mx-auto" style="width:80%">
                         {% for pair in shortcut_items %}
                             {% if pair.shortcut_id == shortcut.id %}
-                                <p>{{ pair.items }}</p>
+                                <p>{{ pair.items.name }}</p>
                                 <img class="img-fluid m-1" width="10%" style="flex: 1 1 10%; max-width: 40%;" src="{{ pair.items.image_path }}" alt="{{ pair.item_name }}">
                             {% endif %}
                         {% endfor %}
