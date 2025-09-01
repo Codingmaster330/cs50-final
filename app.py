@@ -539,7 +539,7 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
     modified_shortcuts = []
     for shortcut in shortcuts:
         shortcut_dict = dict(shortcut)
-        shortcut_dict["difference"] = humanize.naturaltime(datetime.now() - datetime.strptime(shortcut_dict["timestamp"], "%Y-%m-%d %H:%M:%S.%f"))
+        shortcut_dict["difference"] = humanize.naturaltime(datetime.now() - datetime.strptime(shortcut_dict["timestamp"], "%Y-%m-%dT%H:%M:%S.%f"))
         if shorten_description:
             shortcut_dict["description"] = textwrap.shorten(shortcut_dict["description"], 60, placeholder="...")
         modified_shortcuts.append(shortcut_dict)
