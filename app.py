@@ -206,7 +206,7 @@ def shortcut_creation():
         filepath = None
         if file and file.filename != "" and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], SHORTCUTS_FOLDER, filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], SHORTCUTS_FOLDER, filename).replace("\\", "/")
             file.save(filepath)
         if not filepath: filepath = supabase.table("courses").select("image_url").eq("id", course).execute().data[0]["image_url"]
         # if not filepath: filepath = (cur.execute("SELECT image_url FROM courses WHERE id=?", (course,))).fetchone()["image_url"]
@@ -465,7 +465,7 @@ def item_creation():
             return redirect(url_for("item_creation"))
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], ITEMS_FOLDER, filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], ITEMS_FOLDER, filename).replace("\\", "/")
             file.save(filepath)
         
         # con = get_db_connection()
