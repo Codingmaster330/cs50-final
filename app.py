@@ -140,12 +140,13 @@ def register():
         # con.row_factory = sqlite3.Row
         # cur = con.cursor()
 
-        res = supabase.table("users").insert({
+        try:
+            res = supabase.table("users").insert({
             "username": username,
             "hash": hash,
             "is_moderator": 0
-        }).execute()
-        if res.error:
+            }).execute()
+        except:
             flash("Username is already in use.")
             return redirect(url_for("register"))
         # try:
@@ -428,8 +429,9 @@ def cup_creation():
         # con.row_factory = sqlite3.Row
         # cur = con.cursor()
 
-        res = supabase.table("cups").insert({"name": name}).execute()
-        if res.error:
+        try:
+            res = supabase.table("cups").insert({"name": name}).execute()
+        except:
             flash("Cup already exists.")
             return redirect(url_for("cup_creation"))
 
@@ -470,8 +472,9 @@ def item_creation():
         # con.row_factory = sqlite3.Row
         # cur = con.cursor()
 
-        res = supabase.table("items").insert({"name": name, "image_path": filepath}).execute()
-        if res.error:
+        try:
+            res = supabase.table("items").insert({"name": name, "image_path": filepath}).execute()
+        except:
             flash("Item name and/or filename already exists.")
             return redirect(url_for("item_creation"))
         
