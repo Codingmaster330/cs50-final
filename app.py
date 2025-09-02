@@ -202,7 +202,7 @@ def shortcut_creation():
             if not check_video_url(video_url):
                 flash("Video url not valid.")
                 return redirect(url_for("shortcut_creation"))
-            video_url = video_url.replace("watch?v=", "embed/")
+            video_url = video_url.replace("watch?v=", "embed/").split("&")[0].split("?")[0]
 
         file = request.files["image"]
         filepath = None
