@@ -28,9 +28,7 @@
     <p class="w-50 mb-3 mx-auto">{{ shortcut.description }}</p>
     {% if shortcut.video_url %}
         <h3>Shortcut Video</h3>
-        <iframe width="480" height="270" 
-            src="https://www.youtube.com/embed/dQw4w9WgXcQ">
-        </iframe>
+        <p>{{ shortcut.video_url }}</p>
         <iframe width="480" height="270"
             src="{{ shortcut.video_url }}">
         </iframe>
