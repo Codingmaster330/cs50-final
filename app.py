@@ -2,6 +2,7 @@ import os
 import io
 import sys
 import time
+import uuid
 import textwrap
 import sqlite3
 import requests
@@ -206,7 +207,8 @@ def shortcut_creation():
         file = request.files["image"]
         filepath = None
         if file and file.filename != "" and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
+            ext = os.path.splitext(file.filename)[1] 
+            filename = f"{uuid.uuid4()}{ext}"
             file_bytes = file.read()
             supabase.storage.from_("uploads").upload(f"shortcuts/{filename}", file_bytes)
             filepath = f"shortcuts/{filename}"
