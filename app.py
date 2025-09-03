@@ -58,7 +58,7 @@ def index():
 @app.route("/my-shortcuts")
 @login_required
 def my_shortcuts():
-    shortcuts, shortcut_items = get_shortcuts({"users.id": session["user_id"]})
+    shortcuts, shortcut_items = get_shortcuts({"user_id": session["user_id"]})
     return render_template("index.html", shortcuts=shortcuts, shortcut_items=shortcut_items)
 
 @app.route("/view_shortcut", methods=["GET", "POST"])
@@ -202,7 +202,7 @@ def shortcut_creation():
             if not check_video_url(video_url):
                 flash("Video url not valid.")
                 return redirect(url_for("shortcut_creation"))
-            video_url = video_url.replace("watch?v=", "embed/").split("&")[0].split("?")[0]
+            video_url = video_url.replace("watch?v=", "embed/").replace("youtu.be", "www.youtube.com/embed").split("&")[0].split("?")[0]
 
         file = request.files["image"]
         filepath = None
@@ -211,7 +211,7 @@ def shortcut_creation():
             filename = f"{uuid.uuid4()}{ext}"
             file_bytes = file.read()
             supabase.storage.from_("uploads").upload(f"shortcuts/{filename}", file_bytes)
-            filepath = f"shortcuts/{filename}"
+            filepath = supabase.storage.from_("uploads").get_public_url(f"shortcuts/{filename}")
         if not filepath: filepath = supabase.table("courses").select("image_url").eq("id", course).execute().data[0]["image_url"]
         # if not filepath: filepath = (cur.execute("SELECT image_url FROM courses WHERE id=?", (course,))).fetchone()["image_url"]
         
@@ -220,7 +220,7 @@ def shortcut_creation():
             "course_id": course,
             "video_url": video_url, 
             "user_id": session["user_id"],
-            "image_path": supabase.storage.from_("uploads").get_public_url(filepath),
+            "image_path": filepath,
             "description": description,
             "is_approved": 0,
             "timestamp": datetime.now().isoformat()
@@ -526,7 +526,7 @@ def get_shortcuts(where_prompt=None, shorten_description=True):
     
     for column, value in where_prompt.items():
         shortcuts_query = shortcuts_query.eq(column, value)
-        if column == "shortcuts.id":
+        if column == "id":
             shortcut_items_query = shortcut_items_query.eq("shortcut_id", value)
 
     shortcuts = shortcuts_query.execute().data
